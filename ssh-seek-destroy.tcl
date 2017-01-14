@@ -90,7 +90,7 @@ proc sshExpect {host username password} {
 					}
 					close
 					exp_wait
-					return 1
+					return -1
 				}
 			} 
 		}
